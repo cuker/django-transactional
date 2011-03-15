@@ -68,6 +68,7 @@ class TransactionalManager(object):
     
     def managed(self, value):
         self.local.managed = value
+        self._proxy_call('managed', value)
     
     def savepoint_enter(self):
         if not hasattr(self.local, 'savepoints'):

@@ -1,3 +1,4 @@
+import logging
 from django.db import transaction as db_transaction
 
 class DatabaseTransactionMiddleware(object):
@@ -18,6 +19,9 @@ class DatabaseTransactionMiddleware(object):
     def rollback(self):
         db_transaction.rollback(using=self.using)
     
+    def managed(self, flag):
+        db_transaction.managed(flag)
+    
     
     def savepoint_enter(self, savepoint):
         sid = db_transaction.savepoint(using=self.using)
@@ -28,3 +32,33 @@ class DatabaseTransactionMiddleware(object):
     
     def savepoint_commit(self, savepoint):
         db_transaction.savepoint_commit(savepoint['db_sid'], using=self.using)
+
+class LoggingTransactionMiddleware(object):
+    def __init__(self, logger=None):
+        if not logger:
+            logger = logging
+        self.logger = logger
+    
+    def enter(self):
+        self.logger.debug('Entering transaction management')
+    
+    def leave(self):
+        self.logger.debug('Leaving transaction management')
+    
+    def commit(self):
+        self.logger.debug('commit')
+    
+    def rollback(self):
+        self.logger.debug('rollback')
+    
+    def managed(self, flag):
+        self.logger.debug('Set managed: %s' % flag)
+    
+    def savepoint_enter(self, savepoint):
+        self.logger.debug('Save point enter: %s' % savepoint)
+    
+    def savepoint_rollback(self, savepoint):
+        self.logger.debug('Save point rollback: %s' % savepoint)
+    
+    def savepoint_commit(self, savepoint):
+        self.logger.debug('Save point commit: %s' % savepoint)
