@@ -171,7 +171,10 @@ class TransactionalManager(object):
         return self.middleware[path].get_active_save_point()
     
     def record_action(self, path, action):
-        return self.middleware[path].record_action(action)
+        if path not in self.middleware:
+            return False
+        self.middleware[path].record_action(action)
+        return True
     
     def __del__(self):
         try:

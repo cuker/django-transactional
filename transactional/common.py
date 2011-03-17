@@ -51,4 +51,4 @@ def savepoint_commit(sid):
     transactional_manager().savepoint_commit(sid)
 
 def record_action(path, action):
-    transactional_manager().record_action(path, action)
+    return transactional_manager().record_action(path, action)

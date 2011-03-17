@@ -69,7 +69,7 @@ class TransactionalTest(TestCase):
         self.transactional_manager.rollback_unless_managed()
         
         from common import record_action, commit
-        record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', 'foo')
+        assert record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', 'foo')
         self.assert_not_log('Performed: foo')
         commit()
         self.assert_log('Performed: foo')

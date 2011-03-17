@@ -3,7 +3,7 @@ try:
 except ImportError:
     from django.utils.functional import wraps  # Python 2.4 fallback.
 
-from handler import transactional_manager
+import common
 
 #TODO allow specification of transactional middlewares
 
@@ -16,11 +16,11 @@ def autocommit():
     def inner_autocommit(func):
         def _autocommit(*args, **kw):
             try:
-                transactional_manager.enter_transaction_management(managed=False)
-                transactional_manager.managed(False)
+                common.enter_transaction_management(managed=False)
+                common.managed(False)
                 return func(*args, **kw)
             finally:
-                transactional_manager.leave_transaction_management()
+                common.leave_transaction_management()
         return wraps(func)(_autocommit)
     return lambda func: inner_autocommit(func)
 
@@ -35,23 +35,23 @@ def commit_on_success():
     def inner_commit_on_success(func):
         def _commit_on_success(*args, **kw):
             try:
-                transactional_manager.enter_transaction_management()
-                transactional_manager.managed(True)
+                common.enter_transaction_management()
+                common.managed(True)
                 try:
                     res = func(*args, **kw)
                 except:
                     # All exceptions must be handled here (even string ones).
-                    transactional_manager.rollback()
+                    common.rollback()
                     raise
                 else:
                     try:
-                        transactional_manager.commit()
+                        common.commit()
                     except:
-                        transactional_manager.rollback()
+                        common.rollback()
                         raise
                 return res
             finally:
-                transactional_manager.leave_transaction_management()
+                common.leave_transaction_management()
         return wraps(func)(_commit_on_success)
     return lambda func: inner_commit_on_success(func)
 
@@ -65,11 +65,11 @@ def commit_manually():
     def inner_commit_manually(func):
         def _commit_manually(*args, **kw):
             try:
-                transactional_manager.enter_transaction_management()
-                transactional_manager.managed(True)
+                common.enter_transaction_management()
+                common.managed(True)
                 return func(*args, **kw)
             finally:
-                transactional_manager.leave_transaction_management()
+                common.leave_transaction_management()
 
         return wraps(func)(_commit_manually)
     return lambda func: inner_commit_manually(func)
