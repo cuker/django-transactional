@@ -36,6 +36,7 @@ class TransactionalTest(TestCase):
         self.transactional_manager.record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', action)
 
     def test_transactional_manager(self):
+        self.transactional_manager.activate_context()
         self.transactional_manager.enter()
         self.transactional_manager.managed(True)
         self.assert_log('Entering transaction management')
@@ -67,4 +68,12 @@ class TransactionalTest(TestCase):
         self.assert_log('Performed: level 1')
         self.transactional_manager.rollback_unless_managed()
         
+        from common import record_action, commit
+        record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', 'foo')
+        self.assert_not_log('Performed: foo')
+        commit()
+        self.assert_log('Performed: foo')
+        
         self.transactional_manager.leave()
+        self.transactional_manager.deactivate_context()
+
