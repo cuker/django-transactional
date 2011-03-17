@@ -1,3 +1,7 @@
 *~
 *.py[cdo]
+test/bin
+test/include
+test/lib
+test/lib64
 

@@ -1,18 +1,21 @@
-try:
-    import thread
-except ImportError:
-    import dummy_thread as thread
+import threading
+import random
 
 from django.core import exceptions
 from django.utils.importlib import import_module
+from django.utils.datastructures import SortedDict
 
 import settings
 
 def initialize_middleware(paths=None):
-    middlewares = list()
+    middlewares = SortedDict()
     if paths is None:
         paths = settings.TRANSACTIONAL_MIDDLEWARE
     for middleware_path in paths:
+        kwargs = {}
+        args = []
+        if isinstance(middleware_path, (tuple, list)):
+            middleware_path, args, kwargs = middleware_path
         try:
             dot = middleware_path.rindex('.')
         except ValueError:
@@ -29,27 +32,30 @@ def initialize_middleware(paths=None):
 
         if callable(mw_class):
             try:
-                mw_instance = mw_class()
+                mw_instance = mw_class(*args, **kwargs)
             except exceptions.MiddlewareNotUsed:
                 continue
         else:
             mw_instance = mw_class
-        middlewares.append(mw_instance)
+        middlewares[middleware_path] = mw_instance
     return middlewares
 
 class TransactionalManager(object):
     def __init__(self, paths=None):
         self.middleware = initialize_middleware(paths)
-        self.local = thread.local()
+        self.local = threading.local()
     
     def _proxy_call(self, attr, *args, **kwargs):
-        for middleware in self.middleware:
+        for middleware in self.middleware.itervalues():
             if hasattr(middleware, attr):
                 getattr(middleware, attr)(*args, **kwargs)
     
-    def enter(self):
-        self.local.managed = False
+    def get_savepoints(self):
+        return getattr(self.local, 'savepoints', [])
+    
+    def enter(self, flag=False):
         self._proxy_call('enter')
+        self.managed(flag)
     
     def leave(self):
         self._proxy_call('leave')
@@ -73,9 +79,10 @@ class TransactionalManager(object):
     def savepoint_enter(self):
         if not hasattr(self.local, 'savepoints'):
             self.local.savepoints = list()
-        savepoint = dict()
+        savepoint = {'_id': random.random()}
         self.local.savepoints.append(savepoint)
         self._proxy_call('savepoint_enter', savepoint)
+        return savepoint
     
     def savepoint_rollback(self, savepoint):
         self._proxy_call('savepoint_exit', savepoint)
@@ -96,6 +103,9 @@ class TransactionalManager(object):
         """
         if not self.is_managed():
             self.rollback()
+    
+    def get_active_save_point(self, path):
+        return self.middleware[path].get_active_save_point()
 
 transactional_manager = TransactionalManager()
 
