@@ -39,6 +39,9 @@ class DatabaseTransactionMiddleware(object):
 class BaseTransactionMiddleware(object):
     local = threading.local() #uses a shared context within the thread
     
+    def set_handler(self, handler):
+        self.handler = handler
+    
     @property
     def session(self):
         return getattr(self.local, 'session', None)
@@ -51,10 +54,12 @@ class BaseTransactionMiddleware(object):
         pass
     
     def commit(self):
-        return self.session.pop_save_point()
+        for action in self.session.pop_save_point():
+            self.perform_action(action)
     
     def rollback(self):
-        return self.session.pop_save_point()
+        for action in self.session.pop_save_point():
+            self.rollback_action(action)
     
     def managed(self, flag):
         pass
@@ -63,13 +68,27 @@ class BaseTransactionMiddleware(object):
         self.session.add_save_point(savepoint)
     
     def savepoint_rollback(self, savepoint):
-        return self.session.pop_save_point(savepoint)
+        for action in self.session.pop_save_point(savepoint):
+            self.rollback_action(action)
     
     def savepoint_commit(self, savepoint):
-        return self.session.pop_save_point(savepoint)
+        for action in self.session.pop_save_point(savepoint):
+            self.perform_action(action)
     
     def get_active_save_point(self):
         return self.session.tail()
+    
+    def perform_action(self, action):
+        pass
+    
+    def rollback_action(self, action):
+        pass
+    
+    def record_action(self, action):
+        if self.handler.is_managed():
+            self.get_active_save_point().record_action(action)
+        else:
+            self.perform_action(action)
 
 class LoggingTransactionMiddleware(BaseTransactionMiddleware):
     def __init__(self, logger=None):
@@ -88,13 +107,11 @@ class LoggingTransactionMiddleware(BaseTransactionMiddleware):
     
     def commit(self):
         self.logger.debug('commit')
-        for item in super(LoggingTransactionMiddleware, self).commit():
-            self.logger.info(str(item))
+        return super(LoggingTransactionMiddleware, self).commit()
     
     def rollback(self):
         self.logger.debug('rollback')
-        for item in super(LoggingTransactionMiddleware, self).rollback():
-            self.logger.info(str(item))
+        return super(LoggingTransactionMiddleware, self).rollback()
     
     def managed(self, flag):
         self.logger.debug('Set managed: %s' % flag)
@@ -105,11 +122,15 @@ class LoggingTransactionMiddleware(BaseTransactionMiddleware):
     
     def savepoint_rollback(self, savepoint):
         self.logger.debug('Save point rollback: %s' % savepoint)
-        for item in super(LoggingTransactionMiddleware, self).savepoint_rollback(savepoint):
-            self.logger.info(str(item))
+        return super(LoggingTransactionMiddleware, self).savepoint_rollback(savepoint)
     
     def savepoint_commit(self, savepoint):
         self.logger.debug('Save point commit: %s' % savepoint)
-        for item in super(LoggingTransactionMiddleware, self).savepoint_commit(savepoint):
-            self.logger.info(str(item))
+        return super(LoggingTransactionMiddleware, self).savepoint_commit(savepoint)
+    
+    def perform_action(self, action):
+        self.logger.info('Performed: %s' % action)
+    
+    def rollback_action(self, action):
+        self.logger.info('Rollbacked: %s' % action)
 

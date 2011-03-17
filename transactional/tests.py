@@ -26,27 +26,45 @@ class TransactionalTest(TestCase):
         seen = self.handler.messages
         self.handler.messages = list()
         for message in messages:
-            self.assertTrue(message in seen)
+            self.assertTrue(message in seen, '%s not in %s' % (message, seen))
+    
+    def assert_not_log(self, *messages):
+        for message in messages:
+            self.assertTrue(message not in self.handler.messages)
+    
+    def record_action(self, action):
+        self.transactional_manager.record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', action)
 
     def test_transactional_manager(self):
         self.transactional_manager.enter()
+        self.transactional_manager.managed(True)
         self.assert_log('Entering transaction management')
+        self.record_action('foo')
         save_point = self.transactional_manager.get_active_save_point('transactional.transactional_middleware.LoggingTransactionMiddleware')
-        save_point.record_action('foo')
         self.assertEqual(1, len(save_point.actions))
         self.transactional_manager.commit()
         self.assertEqual(0, len(save_point.actions))
-        self.assert_log('foo', 'commit')
+        self.assert_log('Performed: foo', 'commit')
         self.transactional_manager.rollback()
         self.transactional_manager.is_managed()
         
+        self.record_action('level 1')
         sp = self.transactional_manager.savepoint_enter()
+        self.record_action('level 2')
         self.transactional_manager.savepoint_commit(sp)
+        self.assert_not_log('Performed: level 1')
+        self.assert_log('Performed: level 2')
         
         sp = self.transactional_manager.savepoint_enter()
+        self.record_action('level 3')
         self.transactional_manager.savepoint_rollback(sp)
+        self.assert_log('Rollbacked: level 3')
+        self.assert_not_log('Performed: level 1')
         
         self.transactional_manager.commit_unless_managed()
+        self.assert_not_log('Performed: level 1')
+        self.transactional_manager.commit()
+        self.assert_log('Performed: level 1')
         self.transactional_manager.rollback_unless_managed()
         
         self.transactional_manager.leave()

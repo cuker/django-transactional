@@ -44,6 +44,10 @@ class TransactionalManager(object):
     def __init__(self, paths=None):
         self.middleware = initialize_middleware(paths)
         self.local = threading.local()
+        
+        for middleware in self.middleware.itervalues():
+            if hasattr(middleware, 'set_handler'):
+                middleware.set_handler(self)
     
     def _proxy_call(self, attr, *args, **kwargs):
         for middleware in self.middleware.itervalues():
@@ -85,7 +89,7 @@ class TransactionalManager(object):
         return savepoint
     
     def savepoint_rollback(self, savepoint):
-        self._proxy_call('savepoint_exit', savepoint)
+        self._proxy_call('savepoint_rollback', savepoint)
     
     def savepoint_commit(self, savepoint):
         self._proxy_call('savepoint_commit', savepoint)
@@ -106,6 +110,9 @@ class TransactionalManager(object):
     
     def get_active_save_point(self, path):
         return self.middleware[path].get_active_save_point()
+    
+    def record_action(self, path, action):
+        return self.middleware[path].record_action(action)
 
 transactional_manager = TransactionalManager()
 
