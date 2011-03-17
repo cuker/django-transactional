@@ -33,15 +33,21 @@ class TransactionalTest(TestCase):
             self.assertTrue(message not in self.handler.messages)
     
     def record_action(self, action):
-        self.transactional_manager.record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', action)
+        assert self.transactional_manager.record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', action)
 
     def test_transactional_manager(self):
+        from common import record_action, commit
+        record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', 'start')
+        #self.assert_log('Performed: start')
+        
         self.transactional_manager.activate_context()
         self.transactional_manager.enter()
         self.transactional_manager.managed(True)
         self.assert_log('Entering transaction management')
-        self.record_action('foo')
         middleware = self.transactional_manager.middleware['transactional.transactional_middleware.LoggingTransactionMiddleware']
+        assert middleware.is_managed()
+        self.record_action('foo')
+        
         self.assertEqual(1, len(middleware.session.actions))
         self.transactional_manager.commit()
         self.assertEqual(0, len(middleware.session.actions))
@@ -68,7 +74,7 @@ class TransactionalTest(TestCase):
         self.assert_log('Performed: level 1')
         self.transactional_manager.rollback_unless_managed()
         
-        from common import record_action, commit
+        
         assert record_action('transactional.transactional_middleware.LoggingTransactionMiddleware', 'foo')
         self.assert_not_log('Performed: foo')
         commit()

@@ -1,4 +1,4 @@
-from handler import TransactionalManagerContext
+from handler import TransactionalManagerContext, TransactionalManager
 
 transactional_manager = TransactionalManagerContext.get_active_context
 
@@ -50,5 +50,11 @@ def savepoint_commit(sid):
     """
     transactional_manager().savepoint_commit(sid)
 
-def record_action(path, action):
-    return transactional_manager().record_action(path, action)
+def record_action(path, action, treat_nonregistered_as_non_managed=True):
+    ret = transactional_manager().record_action(path, action)
+    if not ret and treat_nonregistered_as_non_managed:
+        manager = TransactionalManager([path])
+        manager.managed(False)
+        ret = manager.record_action(path, action)
+        assert ret
+    return ret

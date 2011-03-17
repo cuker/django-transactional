@@ -62,7 +62,10 @@ class BaseTransactionMiddleware(object):
             self.rollback_action(action)
     
     def managed(self, flag):
-        pass
+        self.local._managed = flag
+    
+    def is_managed(self):
+        return getattr(self.local, '_managed', False)
     
     def savepoint_enter(self, savepoint):
         self.session.add_save_point(savepoint)
@@ -85,7 +88,7 @@ class BaseTransactionMiddleware(object):
         pass
     
     def record_action(self, action):
-        if self.handler.is_managed():
+        if self.is_managed():
             self.session.record_action(action)
         else:
             self.perform_action(action)
@@ -115,6 +118,7 @@ class LoggingTransactionMiddleware(BaseTransactionMiddleware):
     
     def managed(self, flag):
         self.logger.debug('Set managed: %s' % flag)
+        return super(LoggingTransactionMiddleware, self).managed(flag)
     
     def savepoint_enter(self, savepoint):
         self.logger.debug('Save point enter: %s' % savepoint)
