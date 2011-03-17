@@ -174,7 +174,10 @@ class TransactionalManager(object):
         return self.middleware[path].record_action(action)
     
     def __del__(self):
-        self.deactivate_context()
+        try:
+            self.deactivate_context()
+        except:
+            pass
 
 transactional_manager = TransactionalManagerContext.get_active_context
 
