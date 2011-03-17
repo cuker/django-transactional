@@ -40,10 +40,10 @@ class TransactionalTest(TestCase):
         self.transactional_manager.managed(True)
         self.assert_log('Entering transaction management')
         self.record_action('foo')
-        save_point = self.transactional_manager.get_active_save_point('transactional.transactional_middleware.LoggingTransactionMiddleware')
-        self.assertEqual(1, len(save_point.actions))
+        middleware = self.transactional_manager.middleware['transactional.transactional_middleware.LoggingTransactionMiddleware']
+        self.assertEqual(1, len(middleware.session.actions))
         self.transactional_manager.commit()
-        self.assertEqual(0, len(save_point.actions))
+        self.assertEqual(0, len(middleware.session.actions))
         self.assert_log('Performed: foo', 'commit')
         self.transactional_manager.rollback()
         self.transactional_manager.is_managed()

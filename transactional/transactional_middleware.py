@@ -86,7 +86,7 @@ class BaseTransactionMiddleware(object):
     
     def record_action(self, action):
         if self.handler.is_managed():
-            self.get_active_save_point().record_action(action)
+            self.session.record_action(action)
         else:
             self.perform_action(action)
 
