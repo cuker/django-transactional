@@ -2,6 +2,8 @@ import logging
 import threading
 from django.db import transaction as db_transaction
 
+from session import TransactionSession
+
 class DatabaseTransactionMiddleware(object):
     def __init__(self, using=None):
         self.using = using
@@ -34,72 +36,16 @@ class DatabaseTransactionMiddleware(object):
     def savepoint_commit(self, savepoint):
         db_transaction.savepoint_commit(savepoint['db_sid'], using=self.using)
 
-class TransactionSavePoint(object):
-    def __init__(self, parent=None, info=None):
-        self.actions = list()
-        self.child = None
-        self.parent = parent
-        self.info = info
-    
-    def record_action(self, obj):
-        self.actions.append(obj)
-        if self.child:
-            self.child.record_action(obj)
-    
-    def flush(self):
-        actions = self.actions
-        self.actions = list()
-        if self.child:
-            self.child.flush()
-        return actions
-    
-    def find_save_point(self, info):
-        if self.info == info:
-            return self
-        if self.child:
-            return self.child.find_save_point(info)
-    
-    def tail(self):
-        if self.child:
-            return self.child.tail()
-        return self
-    
-    def unlink(self):
-        if self.parent:
-            self.parent.child = None
-
-class TransactionSession(object):
-    def __init__(self, save_point_class=TransactionSavePoint):
-        self.save_point_class = save_point_class
-        self.root_save_point = self.save_point_class()
-    
-    def add_save_point(self, info=None):
-        tail = self.root_save_point.tail()
-        child = self.save_point_class(parent=tail, info=info)
-        tail.child = child
-        return child
-    
-    def pop_save_point(self, info=None):
-        if info is None:
-            self.root_save_point.child = None
-            return self.root_save_point.flush()
-        result = self.root_save_point.find_save_point(info)
-        result.unlink()
-        return result.flush()
-    
-    def tail(self):
-        return self.root_save_point.tail()
-
 class BaseTransactionMiddleware(object):
-    def __init__(self):
-        self.local = threading.local()
+    local = threading.local() #uses a shared context within the thread
     
     @property
     def session(self):
         return getattr(self.local, 'session', None)
     
     def enter(self):
-        self.local.session = TransactionSession()
+        if not self.session:
+            self.local.session = TransactionSession()
     
     def leave(self):
         pass
